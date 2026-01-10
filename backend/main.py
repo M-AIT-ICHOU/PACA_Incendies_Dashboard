@@ -15,6 +15,36 @@ def _utc_iso(dt: datetime) -> str:
     return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def _get_git_sha_short(base_dir: str) -> str | None:
+    """Best-effort git SHA for debugging deployments.
+
+    Works when the repo is available as a git checkout (e.g., local dev, Replit
+    imported from GitHub). Returns None if not available.
+    """
+
+    head_path = os.path.join(base_dir, ".git", "HEAD")
+    try:
+        with open(head_path, "r", encoding="utf-8") as f:
+            head = f.read().strip()
+    except OSError:
+        return None
+
+    if head.startswith("ref:"):
+        ref = head.split(":", 1)[1].strip()
+        ref_path = os.path.join(base_dir, ".git", *ref.split("/"))
+        try:
+            with open(ref_path, "r", encoding="utf-8") as f:
+                sha = f.read().strip()
+        except OSError:
+            return None
+    else:
+        sha = head
+
+    if re.fullmatch(r"[0-9a-fA-F]{7,40}", sha or ""):
+        return sha[:7].lower()
+    return None
+
+
 def _strip_accents(s: str) -> str:
     return "".join(
         c
@@ -229,7 +259,7 @@ def create_app() -> Flask:
 
     @app.get("/api/health")
     def health():
-        return jsonify({"status": "ok"})
+        return jsonify({"status": "ok", "git": _get_git_sha_short(base_dir)})
 
     @app.get("/api/fires")
     def fires():

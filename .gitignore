@@ -44,9 +44,6 @@ Thumbs.db
 /*.xlsx
 /*.xls
 
-# Backend: QGIS2Web exports can be very large
-/backend/data/cartes/
-
 # Next.js: keep only lightweight simplified boundary GeoJSONs
 /nextjs-dashboard/public/geo/*.geojson
 !/nextjs-dashboard/public/geo/*.simplified.geojson

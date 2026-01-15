@@ -4,6 +4,20 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 First, run the development server:
 
+### Windows (PowerShell) note
+
+If you see an error like:
+
+> Unable to load file `...\npm.ps1` because running scripts is disabled
+
+Run npm via the Windows executable instead:
+
+```bash
+npm.cmd run dev
+```
+
+Or switch your VS Code terminal to **Command Prompt (cmd.exe)**.
+
 ```bash
 npm run dev
 # or
@@ -12,6 +26,22 @@ yarn dev
 pnpm dev
 # or
 bun dev
+```
+
+### API URL (required)
+
+This UI expects a backend URL in `NEXT_PUBLIC_API_URL`.
+
+- Create a `.env.local` file in this folder (`nextjs-dashboard/.env.local`) with:
+
+```bash
+NEXT_PUBLIC_API_URL=https://YOUR-REPLIT-DEPLOYMENT.replit.app
+```
+
+- For local backend testing, you can set:
+
+```bash
+NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.

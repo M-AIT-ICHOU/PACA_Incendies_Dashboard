@@ -28,3 +28,28 @@ pnpm-debug.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# --- Project data (do NOT commit) ---
+/CLC/
+/CSV/
+/Cartes/
+/Commune/
+/geo/
+/elevation/
+/pyqgis/
+/Densit*/
+/donn*/
+/
+/data/
+/*.xlsx
+/*.xls
+
+# Backend: QGIS2Web exports can be very large
+/backend/data/cartes/
+
+# Next.js: keep only lightweight simplified boundary GeoJSONs
+/nextjs-dashboard/public/geo/*.geojson
+!/nextjs-dashboard/public/geo/*.simplified.geojson
+
+# Env files
+.env*

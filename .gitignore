@@ -50,3 +50,8 @@ Thumbs.db
 
 # Env files
 .env*
+backend/.env.example
+
+# QGIS2Web exports are generated artifacts (too large for GitHub/LFS quotas)
+/backend/data/cartes/**
+!/backend/data/cartes/.gitkeep

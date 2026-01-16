@@ -5,8 +5,13 @@ import json
 import os
 import random
 import re
+import shutil
+import tempfile
+from typing import Optional
 import unicodedata
+import zipfile
 from datetime import datetime, timedelta, timezone
+from urllib.parse import parse_qs, urlparse
 
 from flask import Flask, Response, jsonify, request, send_from_directory
 from flask_cors import CORS
@@ -357,6 +362,133 @@ def create_app() -> Flask:
     default_csv = os.path.join(base_dir, "data", "liste_incendies_all.csv")
 
     cartes_dir = os.path.join(base_dir, "data", "cartes")
+
+    def _maybe_bootstrap_qgis2web_exports() -> None:
+        """Optionally download a QGIS2Web export ZIP into backend/data/cartes.
+
+        This enables fully-online deployments where the frontend is a single link
+        and the backend can fetch its required map exports at startup.
+
+        Env vars:
+        - QGIS2WEB_EXPORT_ZIP_URL: public URL to a .zip containing one or more qgis2web_* folders
+          (Google Drive share links are supported when gdown is installed).
+        - QGIS2WEB_EXPORTS_SKIP_BOOTSTRAP: set to 1/true/yes to disable.
+        """
+
+        if (os.getenv("QGIS2WEB_EXPORTS_SKIP_BOOTSTRAP") or "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+        }:
+            return
+
+        # Already present.
+        if os.path.isdir(cartes_dir):
+            try:
+                for name in os.listdir(cartes_dir):
+                    full = os.path.join(cartes_dir, name)
+                    if os.path.isdir(full) and name.lower().startswith("qgis2web_"):
+                        return
+            except OSError:
+                pass
+
+        zip_url = (os.getenv("QGIS2WEB_EXPORT_ZIP_URL") or "").strip()
+        if not zip_url:
+            return
+
+        os.makedirs(cartes_dir, exist_ok=True)
+
+        def _is_google_drive_url(u: str) -> bool:
+            try:
+                host = urlparse(u).netloc.lower()
+                return "drive.google.com" in host
+            except Exception:
+                return False
+
+        def _try_extract_drive_file_id(u: str) -> Optional[str]:
+            try:
+                parsed = urlparse(u)
+                if "drive.google.com" not in parsed.netloc.lower():
+                    return None
+                # /file/d/<id>/view
+                m = re.search(r"/file/d/([^/]+)", parsed.path)
+                if m:
+                    return m.group(1)
+                qs = parse_qs(parsed.query)
+                if "id" in qs and qs["id"]:
+                    return qs["id"][0]
+                return None
+            except Exception:
+                return None
+
+        with tempfile.TemporaryDirectory(prefix="qgis2web_") as td:
+            zip_path = os.path.join(td, "qgis2web_export.zip")
+            print(f"[qgis2web] Bootstrapping exports from: {zip_url}")
+
+            # Prefer gdown for Google Drive (handles large-file confirmation)
+            if _is_google_drive_url(zip_url):
+                try:
+                    import gdown  # type: ignore
+
+                    gdown.download(url=zip_url, output=zip_path, quiet=False, fuzzy=True)
+                except Exception as e:
+                    file_id = _try_extract_drive_file_id(zip_url)
+                    hint = (
+                        "Install gdown (pip install gdown) or provide a direct public zip URL."
+                    )
+                    raise RuntimeError(
+                        f"Failed to download from Google Drive (file_id={file_id}): {e}. {hint}"
+                    )
+            else:
+                # Generic HTTP(S) zip URL
+                try:
+                    from urllib.request import urlretrieve
+
+                    urlretrieve(zip_url, zip_path)
+                except Exception as e:
+                    raise RuntimeError(f"Failed to download QGIS2Web ZIP: {e}")
+
+            if not os.path.isfile(zip_path) or os.path.getsize(zip_path) < 1024:
+                raise RuntimeError("Downloaded QGIS2Web ZIP looks empty or missing")
+
+            extract_dir = os.path.join(td, "extract")
+            os.makedirs(extract_dir, exist_ok=True)
+            try:
+                with zipfile.ZipFile(zip_path, "r") as zf:
+                    zf.extractall(extract_dir)
+            except zipfile.BadZipFile as e:
+                raise RuntimeError(f"Invalid ZIP file for QGIS2Web exports: {e}")
+
+            # Find qgis2web_* folders within extracted tree.
+            found = 0
+            for root, dirs, _files in os.walk(extract_dir):
+                for d in list(dirs):
+                    if not d.lower().startswith("qgis2web_"):
+                        continue
+                    src = os.path.join(root, d)
+                    dst = os.path.join(cartes_dir, d)
+                    if os.path.isdir(dst):
+                        # Keep existing folder; don't overwrite.
+                        continue
+                    shutil.move(src, dst)
+                    found += 1
+                # Don't recurse into moved dirs
+                dirs[:] = [d for d in dirs if not d.lower().startswith("qgis2web_")]
+
+            if found == 0:
+                raise RuntimeError(
+                    "QGIS2Web ZIP did not contain any folder named qgis2web_*. "
+                    "Please zip the export directory (including its qgis2web_* folder)."
+                )
+
+            print(f"[qgis2web] Bootstrapped {found} export folder(s) into {cartes_dir}")
+
+    # Ensure exports exist (optional) before serving QGIS2Web endpoints.
+    try:
+        _maybe_bootstrap_qgis2web_exports()
+    except Exception as e:
+        # Don't crash the whole backend: the dashboard can still run without layers.
+        print(f"[qgis2web] Bootstrap failed: {e}")
 
     def _find_latest_qgis2web_export_dir() -> str | None:
         if not os.path.isdir(cartes_dir):

@@ -1,0 +1,5 @@
+{
+  "builds": [
+    { "src": "nextjs-dashboard/package.json", "use": "@vercel/next@latest" }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "projects": {
+    "nextjs-dashboard": {
+      "rootDirectory": "nextjs-dashboard"
+    }
+  }
+}

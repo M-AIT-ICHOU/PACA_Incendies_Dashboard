@@ -16,7 +16,16 @@ from urllib.parse import parse_qs, urlparse
 from flask import Flask, Response, jsonify, request, send_from_directory
 from flask_cors import CORS
 
-from db import get_database_url, db_conn
+try:
+    from db import get_database_url, db_conn
+except ImportError:
+    # Pas de support PostgreSQL : on désactive la base
+    def get_database_url():
+        return None
+    from contextlib import contextmanager
+    @contextmanager
+    def db_conn():
+        raise RuntimeError("DATABASE_URL is not set")
 
 
 def _utc_iso(dt: datetime) -> str:

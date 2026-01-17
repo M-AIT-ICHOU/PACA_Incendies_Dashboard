@@ -483,12 +483,10 @@ def create_app() -> Flask:
 
             print(f"[qgis2web] Bootstrapped {found} export folder(s) into {cartes_dir}")
 
-    # Ensure exports exist (optional) before serving QGIS2Web endpoints.
-    try:
-        _maybe_bootstrap_qgis2web_exports()
-    except Exception as e:
-        # Don't crash the whole backend: the dashboard can still run without layers.
-        print(f"[qgis2web] Bootstrap failed: {e}")
+    # Skip downloading QGIS2Web exports from remote sources.
+    # The backend will rely only on local qgis2web_ folders that are committed in this repository.
+    # Removing the call to _maybe_bootstrap_qgis2web_exports() prevents any attempt to download ZIP files.
+
 
     def _find_latest_qgis2web_export_dir() -> str | None:
         if not os.path.isdir(cartes_dir):
